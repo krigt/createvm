@@ -1,59 +1,38 @@
-Set-StrictMode -Version Latest
+try { Set-StrictMode -Version Latest } catch { try { Set-StrictMode -Version 2 } catch {} }
 $ErrorActionPreference = 'Stop'
 
-[CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)]
-    [string]$VmName,
-
-    [Parameter(Mandatory = $false)]
-    [string]$IsoPath,
-
-    [Parameter(Mandatory = $false)]
-    [string]$SwitchName = 'NatNetworkSwitch',
-
-    [Parameter(Mandatory = $false)]
-    [int]$VmMemoryGB = 8,
-
-    [Parameter(Mandatory = $false)]
-    [int]$VhdSizeGB = 50,
-
-    [Parameter(Mandatory = $false)]
-    [string]$Ip = '10.0.1.200',
-
-    [Parameter(Mandatory = $false)]
-    [string]$Hostname,
-
-    [Parameter(Mandatory = $false)]
-    [string]$Gateway = '10.0.1.1',
-
-    [Parameter(Mandatory = $false)]
-    [string]$Netmask = '255.255.255.0',
-
-    [Parameter(Mandatory = $false)]
-    [string[]]$Dns = @('8.8.8.8','1.1.1.1'),
-
-    [Parameter(Mandatory = $false)]
-    [string]$RootPassword,
-
-    [Parameter(Mandatory = $false)]
-    [string]$PrivateKey,
-
-    [Parameter(Mandatory = $false)]
-    [string]$PublicKey,
-
-    [Parameter(Mandatory = $false)]
-    [string]$VmBaseRoot = 'F:\',
-
-    [Parameter(Mandatory = $false)]
-    [string]$OscdimgPath = 'C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg',
-
-    [Parameter(Mandatory = $false)]
-    [int]$ProcessorCount = 2,
-
-    [Parameter(Mandatory = $false)]
+    $VmName,
+    $IsoPath,
+    $SwitchName,
+    $VmMemoryGB,
+    $VhdSizeGB,
+    $Ip,
+    $Hostname,
+    $Gateway,
+    $Netmask,
+    $Dns,
+    $RootPassword,
+    $PrivateKey,
+    $PublicKey,
+    $VmBaseRoot,
+    $OscdimgPath,
+    $ProcessorCount,
     [switch]$UseGui
 )
+
+# Defaults for older PowerShell where param defaults may not be supported
+if (-not $SwitchName) { $SwitchName = 'NatNetworkSwitch' }
+if (-not $VmMemoryGB) { $VmMemoryGB = 8 }
+if (-not $VhdSizeGB) { $VhdSizeGB = 50 }
+if (-not $Ip) { $Ip = '10.0.1.200' }
+if (-not $Hostname -and $VmName) { $Hostname = "$VmName.local" }
+if (-not $Gateway) { $Gateway = '10.0.1.1' }
+if (-not $Netmask) { $Netmask = '255.255.255.0' }
+if (-not $Dns) { $Dns = '8.8.8.8,1.1.1.1' }
+if (-not $VmBaseRoot) { $VmBaseRoot = 'F:\' }
+if (-not $OscdimgPath) { $OscdimgPath = 'C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg' }
+if (-not $ProcessorCount) { $ProcessorCount = 2 }
 
 function Show-ErrorDialog {
     param([string]$Message)
@@ -76,7 +55,7 @@ function Test-ValidPath {
 }
 
 function Normalize-Dns {
-    param([object]$Dns)
+    param($Dns)
     if ($null -eq $Dns) { return '' }
     if ($Dns -is [string]) { return $Dns }
     return ($Dns -join ',')
@@ -84,7 +63,7 @@ function Normalize-Dns {
 
 function New-KickstartConfig {
     param(
-        [pscustomobject]$Config,
+        $Config,
         [string]$KsPath,
         [int]$PvSize,
         [int]$BootEFISize,
@@ -167,10 +146,10 @@ function New-KsIso {
 }
 
 function New-HyperVVm {
-    param([pscustomobject]$Config)
+    param($Config)
 
     $vmBasePath     = Join-Path $Config.VmBaseRoot $Config.VmName
-    $vhdPath        = Join-Path $vmBasePath "$($Config.VmName).vhdx"
+    $vhdPath        = Join-Path $vmBasePath ("{0}.vhdx" -f $Config.VmName)
     $ksSourceFolder = Join-Path $vmBasePath 'KS_ISO'
     $ksIsoPath      = Join-Path $ksSourceFolder 'ks.iso'
     $answerFilePath = Join-Path $ksSourceFolder 'ks.cfg'
@@ -180,7 +159,7 @@ function New-HyperVVm {
     New-Item -ItemType Directory -Path $ksSourceFolder -Force | Out-Null
 
     # sizes in MB
-    $vhdSizeMB   = [Math]::Floor(($Config.VhdSizeGB * 1GB) / 1MB)
+    $vhdSizeMB   = [Math]::Floor((([int]$Config.VhdSizeGB) * 1GB) / 1MB)
     $bootEFISize = 600
     $bootSize    = 1024
     $swapSize    = 4078
@@ -197,29 +176,29 @@ function New-HyperVVm {
     New-KickstartConfig -Config $Config -KsPath $answerFilePath -PvSize $pvSize -BootEFISize $bootEFISize -BootSize $bootSize -RootMinSize $rootMinSize -RootMaxSize $rootMaxSize -SwapSize $swapSize
     New-KsIso -OscdimgRoot $Config.OscdimgPath -SourceFolder $ksSourceFolder -TargetIso $ksIsoPath
 
-    New-VM -Name $Config.VmName -MemoryStartupBytes ($Config.VmMemoryGB * 1GB) -SwitchName $Config.SwitchName -Generation 2 -NoVHD
-    Set-VM -VMName $Config.VmName -ProcessorCount $Config.ProcessorCount
+    New-VM -Name $Config.VmName -MemoryStartupBytes (([int]$Config.VmMemoryGB) * 1GB) -SwitchName $Config.SwitchName -Generation 2 -NoVHD
+    Set-VM -VMName $Config.VmName -ProcessorCount ([int]$Config.ProcessorCount)
     Set-VMFirmware -VMName $Config.VmName -EnableSecureBoot Off
 
-    New-VHD -Path $vhdPath -SizeBytes ($Config.VhdSizeGB * 1GB) -Dynamic
+    New-VHD -Path $vhdPath -SizeBytes (([int]$Config.VhdSizeGB) * 1GB) -Dynamic
     Add-VMHardDiskDrive -VMName $Config.VmName -Path $vhdPath
 
     Add-VMDvdDrive -VMName $Config.VmName -Path $Config.IsoPath
     Add-VMDvdDrive -VMName $Config.VmName -Path $ksIsoPath
 
-    $dvdDrive = Get-VMDvdDrive -VMName $Config.VmName | Where-Object Path -eq $Config.IsoPath
+    $dvdDrive = Get-VMDvdDrive -VMName $Config.VmName | Where-Object { $_.Path -eq $Config.IsoPath }
     if ($dvdDrive) { Set-VMFirmware -VMName $Config.VmName -FirstBootDevice $dvdDrive }
 
     Start-VM -Name $Config.VmName
     Start-Sleep -Seconds 3
-    Start-Process vmconnect -ArgumentList "localhost $($Config.VmName)" | Out-Null
+    Start-Process vmconnect -ArgumentList ("localhost {0}" -f $Config.VmName) | Out-Null
 
-    return [pscustomobject]@{
+    return (New-Object -TypeName PSObject -Property @{
         VmBasePath     = $vmBasePath
         VhdPath        = $vhdPath
         KsIsoPath      = $ksIsoPath
         AnswerFilePath = $answerFilePath
-    }
+    })
 }
 
 function Show-CreateVmForm {
@@ -235,8 +214,8 @@ function Show-CreateVmForm {
         VmName      = $VmName
         IsoPath     = $IsoPath
         SwitchName  = $SwitchName
-        VmMemory    = $VmMemoryGB.ToString()
-        VhdSize     = $VhdSizeGB.ToString()
+        VmMemory    = ([string]$VmMemoryGB)
+        VhdSize     = ([string]$VhdSizeGB)
         Ip          = $Ip
         Hostname    = if ([string]::IsNullOrWhiteSpace($Hostname)) { '$vmName.local' } else { $Hostname }
         Gateway     = $Gateway
@@ -435,8 +414,9 @@ function Show-CreateVmForm {
 
         $memText = ($textVmMemory.Text).Trim()
         $sizeText = ($textVhdSize.Text).Trim()
-        if (-not [int]::TryParse($memText, [ref]([int]0))) { Show-ErrorDialog('Объем памяти должен быть числом.'); return }
-        if (-not [int]::TryParse($sizeText, [ref]([int]0))) { Show-ErrorDialog('Размер диска должен быть числом.'); return }
+        $tmp = 0
+        if (-not [int]::TryParse($memText, [ref]$tmp)) { Show-ErrorDialog('Объем памяти должен быть числом.'); return }
+        if (-not [int]::TryParse($sizeText, [ref]$tmp)) { Show-ErrorDialog('Размер диска должен быть числом.'); return }
 
         $rootPass = ($textRootPassword.Text).Trim()
         if ([string]::IsNullOrWhiteSpace($rootPass)) { Show-ErrorDialog('Root пароль не может быть пустым.'); return }
@@ -448,7 +428,7 @@ function Show-CreateVmForm {
         $host = (($textHostname.Text).Trim() -replace '\$vmName', $name)
         $dnsStr = (($textDns.Text).Trim())
 
-        $form.Tag = [pscustomobject]@{
+        $form.Tag = (New-Object -TypeName PSObject -Property @{
             VmName         = $name
             IsoPath        = $iso
             SwitchName     = ($textSwitchName.Text).Trim()
@@ -465,7 +445,7 @@ function Show-CreateVmForm {
             VmBaseRoot     = $VmBaseRoot
             OscdimgPath    = $OscdimgPath
             ProcessorCount = $ProcessorCount
-        }
+        })
         $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $form.Close()
     })
@@ -481,7 +461,7 @@ function Get-ConfigFromParams {
     $resolvedHostname = if ([string]::IsNullOrWhiteSpace($Hostname)) { if (-not [string]::IsNullOrWhiteSpace($VmName)) { "$VmName.local" } else { '' } } else { $Hostname }
     $resolvedHostname = ($resolvedHostname -replace '\$vmName', $VmName)
 
-    return [pscustomobject]@{
+    return (New-Object -TypeName PSObject -Property @{
         VmName         = $VmName
         IsoPath        = $IsoPath
         SwitchName     = $SwitchName
@@ -498,7 +478,7 @@ function Get-ConfigFromParams {
         VmBaseRoot     = $VmBaseRoot
         OscdimgPath    = $OscdimgPath
         ProcessorCount = $ProcessorCount
-    }
+    })
 }
 
 # === Entry point ===
