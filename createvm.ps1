@@ -1,6 +1,3 @@
-try { Set-StrictMode -Version Latest } catch { try { Set-StrictMode -Version 2 } catch {} }
-$ErrorActionPreference = 'Stop'
-
 param(
     $VmName,
     $IsoPath,
@@ -20,6 +17,9 @@ param(
     $ProcessorCount,
     [switch]$UseGui
 )
+
+try { Set-StrictMode -Version Latest } catch { try { Set-StrictMode -Version 2 } catch {} }
+$ErrorActionPreference = 'Stop'
 
 # Defaults for older PowerShell where param defaults may not be supported
 if (-not $SwitchName) { $SwitchName = 'NatNetworkSwitch' }
