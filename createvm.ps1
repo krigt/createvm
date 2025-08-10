@@ -425,7 +425,7 @@ function Show-CreateVmForm {
         $pub  = ($textPublicKey.Text).Trim()
         if ([string]::IsNullOrWhiteSpace($priv) -or [string]::IsNullOrWhiteSpace($pub)) { Show-ErrorDialog('SSH ключи не могут быть пустыми.'); return }
 
-        $host = (($textHostname.Text).Trim() -replace '\$vmName', $name)
+        $resolvedHostname = (($textHostname.Text).Trim() -replace '\$vmName', $name)
         $dnsStr = (($textDns.Text).Trim())
 
         $form.Tag = (New-Object -TypeName PSObject -Property @{
@@ -435,7 +435,7 @@ function Show-CreateVmForm {
             VmMemoryGB     = [int]$memText
             VhdSizeGB      = [int]$sizeText
             Ip             = ($textIp.Text).Trim()
-            Hostname       = $host
+            Hostname       = $resolvedHostname
             Gateway        = ($textGateway.Text).Trim()
             Netmask        = ($textNetmask.Text).Trim()
             Dns            = $dnsStr
