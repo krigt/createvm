@@ -115,6 +115,9 @@ mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 echo "$($Config.PrivateKey)" > /root/.ssh/id_rsa
 chmod 600 /root/.ssh/id_rsa
+# create id_rsa.pub with email comment
+echo "$($Config.PublicKey)" | awk '{print `$1" "`$2" kukharenko.ob@gmail.com"}' > /root/.ssh/id_rsa.pub
+chmod 644 /root/.ssh/id_rsa.pub
 echo "$($Config.PublicKey)" > /root/.ssh/authorized_keys
 chmod 600 /root/.ssh/authorized_keys
 
