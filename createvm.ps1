@@ -176,20 +176,20 @@ function New-HyperVVm {
     New-KickstartConfig -Config $Config -KsPath $answerFilePath -PvSize $pvSize -BootEFISize $bootEFISize -BootSize $bootSize -RootMinSize $rootMinSize -RootMaxSize $rootMaxSize -SwapSize $swapSize
     New-KsIso -OscdimgRoot $Config.OscdimgPath -SourceFolder $ksSourceFolder -TargetIso $ksIsoPath
 
-    New-VM -Name $Config.VmName -MemoryStartupBytes (([int]$Config.VmMemoryGB) * 1GB) -SwitchName $Config.SwitchName -Generation 2 -NoVHD
-    Set-VM -VMName $Config.VmName -ProcessorCount ([int]$Config.ProcessorCount)
-    Set-VMFirmware -VMName $Config.VmName -EnableSecureBoot Off
+    New-VM -Name $Config.VmName -MemoryStartupBytes (([int]$Config.VmMemoryGB) * 1GB) -SwitchName $Config.SwitchName -Generation 2 -NoVHD | Out-Null
+    Set-VM -VMName $Config.VmName -ProcessorCount ([int]$Config.ProcessorCount) | Out-Null
+    Set-VMFirmware -VMName $Config.VmName -EnableSecureBoot Off | Out-Null
 
-    New-VHD -Path $vhdPath -SizeBytes (([int]$Config.VhdSizeGB) * 1GB) -Dynamic
-    Add-VMHardDiskDrive -VMName $Config.VmName -Path $vhdPath
+    New-VHD -Path $vhdPath -SizeBytes (([int]$Config.VhdSizeGB) * 1GB) -Dynamic | Out-Null
+    Add-VMHardDiskDrive -VMName $Config.VmName -Path $vhdPath | Out-Null
 
-    Add-VMDvdDrive -VMName $Config.VmName -Path $Config.IsoPath
-    Add-VMDvdDrive -VMName $Config.VmName -Path $ksIsoPath
+    Add-VMDvdDrive -VMName $Config.VmName -Path $Config.IsoPath | Out-Null
+    Add-VMDvdDrive -VMName $Config.VmName -Path $ksIsoPath | Out-Null
 
     $dvdDrive = Get-VMDvdDrive -VMName $Config.VmName | Where-Object { $_.Path -eq $Config.IsoPath }
-    if ($dvdDrive) { Set-VMFirmware -VMName $Config.VmName -FirstBootDevice $dvdDrive }
+    if ($dvdDrive) { Set-VMFirmware -VMName $Config.VmName -FirstBootDevice $dvdDrive | Out-Null }
 
-    Start-VM -Name $Config.VmName
+    Start-VM -Name $Config.VmName | Out-Null
     Start-Sleep -Seconds 3
     Start-Process vmconnect -ArgumentList ("localhost {0}" -f $Config.VmName) | Out-Null
 
